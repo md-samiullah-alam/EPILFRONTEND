@@ -83,10 +83,31 @@ export default function SupportTicket() {
     setCreating(false);
   };
 
+
+  //   const markDone = async (id) => {
+  //   setUpdating(id);
+  //   try {
+  //     await axios.patch(
+  //       `/support-tickets/status/${id}`,
+  //       { Status: "Done" },
+  //       authHeader
+  //     );
+  //     // ✅ Refresh after marking done
+  //     await loadCreatedTickets();
+  //   } catch {
+  //     alert("Failed to update");
+  //   }
+  //   setUpdating(null);
+  // };
+
   const updateStatus = async (id, status) => {
     setUpdating((p) => ({ ...p, [id]: true }));
+
+    console.log("Id: ", id);
+      const cleanId = encodeURIComponent(id.trim());
+    
     try {
-      await axios.patch(`/support-tickets/status/${id}`, { Status: status }, authHeader);
+      await axios.patch(`/support-tickets/status/${cleanId}`, { Status: status }, authHeader);
       await loadTickets();
     } catch (err) {
       alert(err.response?.data?.error || "Failed to update status");
