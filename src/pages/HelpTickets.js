@@ -84,8 +84,10 @@ export default function HelpTickets() {
 
   const updateStatus = async (id, status) => {
     setUpdating((p) => ({ ...p, [id]: true }));
+          const cleanId = encodeURIComponent(id.trim());
+
     try {
-      await axios.patch(`/helpTickets/status/${id}`, { Status: status }, authHeader);
+      await axios.patch(`/helpTickets/status/${cleanId}`, { Status: status }, authHeader);
       await loadTickets(); // loadingTickets only affects ticket list
     } catch (err) {
       alert(err.response?.data?.error || "Failed to update status");
