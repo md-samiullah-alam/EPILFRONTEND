@@ -300,16 +300,6 @@ export default function Topbar() {
       icon: "💃"
     },
     { 
-      name: "Maharaja Agrasen Jayanti", 
-      month: 9,
-      startDay: 9, // 2 days before 11 Oct
-      endDay: 11,
-      message: "👑 Maharaja Agrasen Jayanti - Legacy of Unity! 👑",
-      bgColor: "#fbbf24", // Golden
-      textColor: "#1e293b",
-      icon: "👑"
-    },
-    { 
       name: "Durga Ashtami", 
       month: 9,
       startDay: 17, // 2 days before 19 Oct
@@ -457,7 +447,7 @@ export default function Topbar() {
     }
   ];
 
-  // Get current festival if any
+  // Get current festival if any - IMPROVED VERSION
   const getCurrentFestival = () => {
     const today = new Date();
     const currentMonth = today.getMonth();
@@ -466,19 +456,32 @@ export default function Topbar() {
 
     for (let festival of festivals) {
       // Handle New Year (cross-year)
-      if (festival.name === "New Year" && currentYear === 2027) {
-        if ((currentMonth === 11 && currentDate >= festival.startDay) || 
-            (currentMonth === 0 && currentDate <= festival.endDay)) {
+      if (festival.name === "New Year") {
+        // For Dec 30-31, 2026
+        if (currentYear === 2026 && currentMonth === 11 && 
+            currentDate >= festival.startDay && currentDate <= 31) {
           return festival;
         }
-      } 
-      // Handle month-end festivals (like Hanuman Jayanti starting March 31)
-      else if (festival.startDay > 28 && festival.month === currentMonth) {
-        if (currentDate >= festival.startDay || currentDate <= festival.endDay) {
+        // For Jan 1, 2027
+        if (currentYear === 2027 && currentMonth === 0 && 
+            currentDate >= 1 && currentDate <= festival.endDay) {
           return festival;
         }
       }
-      // Normal festivals
+      
+      // Handle festivals that span across months (endDay < startDay)
+      else if (festival.endDay < festival.startDay) {
+        // Case 1: Current month is festival month (starting month)
+        if (currentMonth === festival.month && currentDate >= festival.startDay) {
+          return festival;
+        }
+        // Case 2: Current month is next month (ending month)
+        if (currentMonth === (festival.month + 1) % 12 && currentDate <= festival.endDay) {
+          return festival;
+        }
+      }
+      
+      // Normal festivals (within same month)
       else if (currentMonth === festival.month && 
           currentDate >= festival.startDay && 
           currentDate <= festival.endDay) {
@@ -761,11 +764,15 @@ export default function Topbar() {
                 </React.Fragment>
               ));
             } else {
-              // Default system alert
-              const alertMsg =
-                "Refresh the portal before adding a task; if issues continue, log out/in or raise a support ticket.";
+              // Default system alert - jab koi festival na ho
+              const alertMessages = [
+                "🔄 Refresh the portal before adding a task",
+                "⚠️ If issues continue, log out/in or raise a support ticket",
+                "📢 System Update: Regular maintenance",
+                "🔄 Refresh the portal before adding a task",
+              ];
               // Duplicate content for seamless scroll
-              return [alertMsg, alertMsg].map((msg, i) => (
+              return [...alertMessages, ...alertMessages].map((msg, i) => (
                 <span key={i} className="px-4">{msg}</span>
               ));
             }
