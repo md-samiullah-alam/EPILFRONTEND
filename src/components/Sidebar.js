@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes } from "react-icons/fa";
+import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes, FaCodeBranch } from "react-icons/fa";
 import axios from "axios";
 
 const MenuItem = ({ to, children, icon: Icon, onClick, count }) => (
@@ -30,8 +30,11 @@ export default function Sidebar({ mobile }) {
   const [delegationCount, setdelegationCount] = useState(0);
   const [checklistCount, setchecklistCount] = useState(0);
 
-const today = new Date();
-today.setHours(0, 0, 0, 0);
+  // ✅ VERSION NUMBER - MANUAL (Badlo jab naya version deploy karo)
+  const version = "2.1.0";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +50,7 @@ today.setHours(0, 0, 0, 0);
         headers: { Authorization: `Bearer ${token}` },
       };
 
-      const [supportRes, helpRes,checklistRes, delegationRes] = await Promise.all([
+      const [supportRes, helpRes, checklistRes, delegationRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/support-tickets/assigned`, authHeader),
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/helpTickets/assigned`, authHeader),
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/checklist/`, authHeader),
@@ -56,37 +59,36 @@ today.setHours(0, 0, 0, 0);
 
       const activeSupport = (supportRes.data || []).filter((t) => t.Status !== "Done");
       const activeHelp = (helpRes.data || []).filter((t) => t.Status !== "Done");
-      const delegationfilter=(delegationRes.data||[]).filter((t)=>((t.Status === "Pending" || t.Status === "Shifted") &&
+      const delegationfilter = (delegationRes.data || []).filter((t) => ((t.Status === "Pending" || t.Status === "Shifted") &&
         !t.FinalDate &&
         (t.Taskcompletedapproval === "" || t.Taskcompletedapproval === "Pending") &&
-        t.Taskcompletedapproval !== "Approved")||(t.deadline<=new Date().toLocaleDateString('en-GB')))
+        t.Taskcompletedapproval !== "Approved") || (t.deadline <= new Date().toLocaleDateString('en-GB')))
 
-        const checklistfilter = (checklistRes.data || []).filter((t) => {
-  if (!t.Planned) return false;
+      const checklistfilter = (checklistRes.data || []).filter((t) => {
+        if (!t.Planned) return false;
 
-  const [datePart, timePart] = t.Planned.split(' ');
-  const [day, month, year] = datePart.split('/');
-  const [hour, minute, second] = timePart.split(':');
+        const [datePart, timePart] = t.Planned.split(' ');
+        const [day, month, year] = datePart.split('/');
+        const [hour, minute, second] = timePart.split(':');
 
-  const plannedDate = new Date(
-    year,
-    month - 1,
-    day,
-    hour,
-    minute,
-    second
-  );
+        const plannedDate = new Date(
+          year,
+          month - 1,
+          day,
+          hour,
+          minute,
+          second
+        );
 
-  plannedDate.setHours(0, 0, 0, 0);
+        plannedDate.setHours(0, 0, 0, 0);
 
-  return plannedDate <= today;
-});
+        return plannedDate <= today;
+      });
 
-        setdelegationCount(delegationfilter.length)
-        console.log("checklistfilter:",checklistfilter , "count:",checklistfilter.length);
-        setchecklistCount(checklistfilter.length)
-        console.log("Delegation Filter:",delegationfilter, "Count:",delegationfilter.length);
-        
+      setdelegationCount(delegationfilter.length)
+      console.log("checklistfilter:", checklistfilter, "count:", checklistfilter.length);
+      setchecklistCount(checklistfilter.length)
+      console.log("Delegation Filter:", delegationfilter, "Count:", delegationfilter.length);
 
       setSupportTicketCount(activeSupport.length);
       setHelpTicketCount(activeHelp.length);
@@ -97,14 +99,15 @@ today.setHours(0, 0, 0, 0);
   };
 
   useEffect(() => {
-    loadTickets(); // initial load
+    loadTickets();
     const interval = setInterval(() => {
       loadTickets();
-    }, 900000); // 1 hour in ms
+    }, 900000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // MOBILE SIDEBAR
   if (mobile) {
     return (
       <>
@@ -116,7 +119,7 @@ today.setHours(0, 0, 0, 0);
         </button>
 
         <aside
-          className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 ${
+          className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 flex flex-col ${
             isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -125,23 +128,29 @@ today.setHours(0, 0, 0, 0);
               ✕
             </button>
             <div className="text-right">
-              <div className="text-lg font-semibold leading-none">Employee Portal</div>
+              <div className="text-lg font-semibold leading-none">Doer Panel</div>
               <div className="text-[11px] text-gray-400 mt-1 leading-none">Task Management</div>
             </div>
           </div>
 
-          <nav className="p-6 space-y-2">
-        <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
-
-            <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar} count={delegationCount} >Delegation</MenuItem>
-            <MenuItem to="/checklist" icon={FaClipboardList} onClick={closeSidebar} count={checklistCount} >Checklist</MenuItem>
+          <nav className="flex-1 p-6 space-y-2">
+            <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
+            <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar} count={delegationCount}>Delegation</MenuItem>
+            <MenuItem to="/checklist" icon={FaClipboardList} onClick={closeSidebar} count={checklistCount}>Checklist</MenuItem>
             <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>Help Ticket</MenuItem>
-
             <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>Support Ticket</MenuItem>
             <MenuItem to="/additional-feature" icon={FaLifeRing} count={0}>Additional Feature</MenuItem>
-
-
           </nav>
+
+          {/* ✅ VERSION AT BOTTOM - MOBILE */}
+          <div className="p-4 border-t border-gray-800 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <FaCodeBranch className="w-3 h-3" />
+              <span>v{version}</span>
+              <span className="mx-1">•</span>
+              <span>© 2024</span>
+            </div>
+          </div>
         </aside>
 
         {isOpen && <div className="fixed inset-0 bg-black bg-opacity-40 z-[80]" onClick={closeSidebar} />}
@@ -149,24 +158,32 @@ today.setHours(0, 0, 0, 0);
     );
   }
 
+  // DESKTOP SIDEBAR
   return (
     <aside className="h-screen w-64 bg-gray-900 text-white flex flex-col">
       <div className="px-6 py-5 border-b border-gray-800">
-        <div className="text-2xl font-bold">Employee Portal</div>
+        <div className="text-2xl font-bold">Doer Panel</div>
         <div className="text-xs text-gray-400">Task Management</div>
       </div>
 
-      <nav className="p-6 space-y-2">
+      <nav className="flex-1 p-6 space-y-2">
         <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
-
         <MenuItem to="/delegation" icon={FaTasks} count={delegationCount}>Delegation</MenuItem>
         <MenuItem to="/checklist" icon={FaClipboardList} count={checklistCount}>Checklist</MenuItem>
         <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>Help Ticket</MenuItem>
-
         <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>Support Ticket</MenuItem>
         <MenuItem to="/additional-feature" icon={FaLifeRing} count={0}>Additional Feature</MenuItem>
-
       </nav>
+
+      {/* ✅ VERSION AT BOTTOM - DESKTOP */}
+      <div className="p-4 border-t border-gray-800 text-center">
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+          <FaCodeBranch className="w-3 h-3" />
+          <span>v{version}</span>
+          <span className="mx-1">•</span>
+          <span>© 2026</span>
+        </div>
+      </div>
     </aside>
   );
 }
