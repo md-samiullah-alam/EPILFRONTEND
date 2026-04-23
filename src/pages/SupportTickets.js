@@ -35,6 +35,15 @@ export default function SupportTicket() {
   const [showDropdown, setShowDropdown] = useState({});
   const [actionLoading, setActionLoading] = useState({});
 
+  // New state for Done modal
+  const [doneModal, setDoneModal] = useState({
+    isOpen: false,
+    ticketId: null,
+    issue: "",
+    problem: "",
+    solution: ""
+  });
+
   const fileInputRef = useRef();
   const authHeader = { headers: { Authorization: `Bearer ${user.token}` } };
 
@@ -183,6 +192,66 @@ export default function SupportTicket() {
       });
     } finally {
       setUpdating((p) => ({ ...p, [id]: false }));
+    }
+  };
+
+  // New function to open Done modal
+  const openDoneModal = (ticketId, issue) => {
+    setDoneModal({
+      isOpen: true,
+      ticketId: ticketId,
+      issue: issue,
+      problem: "",
+      solution: ""
+    });
+  };
+
+  // New function to submit done details
+  const submitDoneDetails = async () => {
+    if (!doneModal.problem || !doneModal.solution) {
+      toast.error("Please fill both Problem and Solution fields");
+      return;
+    }
+    
+    const toastId = toast.loading("Submitting done details...");
+    
+    try {
+      // First save problem and solution
+      await axios.patch(
+        `/support-tickets/done-details/${encodeURIComponent(doneModal.ticketId.trim())}`,
+        {
+          Problem: doneModal.problem,
+          Solution: doneModal.solution
+        },
+        authHeader
+      );
+      
+      // Then update status to Done
+      await axios.patch(
+        `/support-tickets/status/${encodeURIComponent(doneModal.ticketId.trim())}`,
+        { Status: "Done" },
+        authHeader
+      );
+      
+      await loadTickets();
+      
+      toast.update(toastId, {
+        render: "Ticket completed with details!",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+      
+      setDoneModal({ isOpen: false, ticketId: null, issue: "", problem: "", solution: "" });
+      
+    } catch (err) {
+      console.error("Error submitting done details:", err);
+      toast.update(toastId, {
+        render: err.response?.data?.error || "Failed to submit details",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
     }
   };
 
@@ -554,7 +623,7 @@ export default function SupportTicket() {
                           {group.Status === "InProgress" && group.uniqueWorkBy && group.uniqueWorkBy.includes(user.name) && (
                             <button
                               disabled={updating[group.TicketID] || isActionLoading}
-                              onClick={() => updateStatus(group.TicketID, "Done")}
+                              onClick={() => openDoneModal(group.TicketID, group.Issue)}
                               className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 transition"
                             >
                               {updating[group.TicketID] ? "..." : "Done"}
@@ -761,6 +830,81 @@ export default function SupportTicket() {
             })}
           </div>
         </>
+      )}
+
+      {/* Done Modal */}
+      {doneModal.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4"
+          onClick={() => setDoneModal({ isOpen: false, ticketId: null, issue: "", problem: "", solution: "" })}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Complete Ticket</h3>
+              <button
+                onClick={() => setDoneModal({ isOpen: false, ticketId: null, issue: "", problem: "", solution: "" })}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Issue / Problem
+                </label>
+                <div className="bg-gray-50 p-3 rounded border text-sm">
+                  {doneModal.issue}
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Where was the problem? *
+                </label>
+                <textarea
+                  className="w-full border p-3 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  rows="3"
+                  placeholder="Example : FMS 26, Recruitmet onboarding sheet ......."
+                  value={doneModal.problem}
+                  onChange={(e) => setDoneModal({ ...doneModal, problem: e.target.value })}
+                />
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  What solution did you implement? *
+                </label>
+                <textarea
+                  className="w-full border p-3 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  rows="3"
+                  placeholder="Describe the solution you implemented..."
+                  value={doneModal.solution}
+                  onChange={(e) => setDoneModal({ ...doneModal, solution: e.target.value })}
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDoneModal({ isOpen: false, ticketId: null, issue: "", problem: "", solution: "" })}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitDoneDetails}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                >
+                  Submit & Complete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Image Modal */}
