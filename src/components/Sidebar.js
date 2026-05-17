@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes, FaCodeBranch } from "react-icons/fa";
+import { FaTasks, FaClipboardList, FaLifeRing, FaHeadset, FaBars, FaTimes, FaCodeBranch, FaList } from "react-icons/fa";
 import axios from "axios";
 
 const MenuItem = ({ to, children, icon: Icon, onClick, count }) => (
@@ -30,9 +30,7 @@ export default function Sidebar({ mobile }) {
   const [delegationCount, setdelegationCount] = useState(0);
   const [checklistCount, setchecklistCount] = useState(0);
 
-  // ✅ VERSION NUMBER - MANUAL (Badlo jab naya version deploy karo)
   const version = "2.1.0";
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -46,9 +44,7 @@ export default function Sidebar({ mobile }) {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const authHeader = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
 
       const [supportRes, helpRes, checklistRes, delegationRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_BASE_URL}/api/support-tickets/assigned`, authHeader),
@@ -66,30 +62,16 @@ export default function Sidebar({ mobile }) {
 
       const checklistfilter = (checklistRes.data || []).filter((t) => {
         if (!t.Planned) return false;
-
         const [datePart, timePart] = t.Planned.split(' ');
         const [day, month, year] = datePart.split('/');
         const [hour, minute, second] = timePart.split(':');
-
-        const plannedDate = new Date(
-          year,
-          month - 1,
-          day,
-          hour,
-          minute,
-          second
-        );
-
+        const plannedDate = new Date(year, month - 1, day, hour, minute, second);
         plannedDate.setHours(0, 0, 0, 0);
-
         return plannedDate <= today;
       });
 
       setdelegationCount(delegationfilter.length)
-      console.log("checklistfilter:", checklistfilter, "count:", checklistfilter.length);
       setchecklistCount(checklistfilter.length)
-      console.log("Delegation Filter:", delegationfilter, "Count:", delegationfilter.length);
-
       setSupportTicketCount(activeSupport.length);
       setHelpTicketCount(activeHelp.length);
     } catch (err) {
@@ -100,10 +82,7 @@ export default function Sidebar({ mobile }) {
 
   useEffect(() => {
     loadTickets();
-    const interval = setInterval(() => {
-      loadTickets();
-    }, 900000);
-
+    const interval = setInterval(() => { loadTickets(); }, 900000);
     return () => clearInterval(interval);
   }, []);
 
@@ -111,28 +90,17 @@ export default function Sidebar({ mobile }) {
   if (mobile) {
     return (
       <>
-        <button
-          className="md:hidden fixed top-4 left-4 z-[100] bg-gray-900 text-white p-2 rounded-md shadow-lg"
-          onClick={toggleSidebar}
-        >
+        <button className="md:hidden fixed top-4 left-4 z-[100] bg-gray-900 text-white p-2 rounded-md shadow-lg" onClick={toggleSidebar}>
           {isOpen ? <FaTimes size={22} /> : <FaBars size={22} />}
         </button>
-
-        <aside
-          className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 flex flex-col ${
-            isOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
+        <aside className={`fixed top-0 left-0 h-full w-64 bg-gray-900 text-white z-[90] transform transition-transform duration-300 flex flex-col ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
-            <button onClick={closeSidebar} className="text-gray-400 hover:text-white text-2xl">
-              ✕
-            </button>
+            <button onClick={closeSidebar} className="text-gray-400 hover:text-white text-2xl">✕</button>
             <div className="text-right">
               <div className="text-lg font-semibold leading-none">Doer Panel</div>
               <div className="text-[11px] text-gray-400 mt-1 leading-none">Task Management</div>
             </div>
           </div>
-
           <nav className="flex-1 p-6 space-y-2">
             <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
             <MenuItem to="/delegation" icon={FaTasks} onClick={closeSidebar} count={delegationCount}>Delegation</MenuItem>
@@ -140,9 +108,8 @@ export default function Sidebar({ mobile }) {
             <MenuItem to="/help-ticket" icon={FaLifeRing} onClick={closeSidebar} count={helpTicketCount}>Help Ticket</MenuItem>
             <MenuItem to="/support-ticket" icon={FaHeadset} onClick={closeSidebar} count={supportTicketCount}>Support Ticket</MenuItem>
             <MenuItem to="/additional-feature" icon={FaLifeRing} count={0}>Additional Feature</MenuItem>
+            <MenuItem to="/worklist" icon={FaList} onClick={closeSidebar} count={0}>WorkList</MenuItem>
           </nav>
-
-          {/* ✅ VERSION AT BOTTOM - MOBILE */}
           <div className="p-4 border-t border-gray-800 text-center">
             <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
               <FaCodeBranch className="w-3 h-3" />
@@ -152,7 +119,6 @@ export default function Sidebar({ mobile }) {
             </div>
           </div>
         </aside>
-
         {isOpen && <div className="fixed inset-0 bg-black bg-opacity-40 z-[80]" onClick={closeSidebar} />}
       </>
     );
@@ -165,7 +131,6 @@ export default function Sidebar({ mobile }) {
         <div className="text-2xl font-bold">Doer Panel</div>
         <div className="text-xs text-gray-400">Task Management</div>
       </div>
-
       <nav className="flex-1 p-6 space-y-2">
         <MenuItem to="/dashboard" icon={FaTasks} count={0}>Dashboard</MenuItem>
         <MenuItem to="/delegation" icon={FaTasks} count={delegationCount}>Delegation</MenuItem>
@@ -173,9 +138,8 @@ export default function Sidebar({ mobile }) {
         <MenuItem to="/help-ticket" icon={FaLifeRing} count={helpTicketCount}>Help Ticket</MenuItem>
         <MenuItem to="/support-ticket" icon={FaHeadset} count={supportTicketCount}>Support Ticket</MenuItem>
         <MenuItem to="/additional-feature" icon={FaLifeRing} count={0}>Additional Feature</MenuItem>
+        <MenuItem to="/worklist" icon={FaList} count={0}>WorkList</MenuItem>
       </nav>
-
-      {/* ✅ VERSION AT BOTTOM - DESKTOP */}
       <div className="p-4 border-t border-gray-800 text-center">
         <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
           <FaCodeBranch className="w-3 h-3" />
