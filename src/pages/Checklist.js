@@ -10,6 +10,7 @@ export default function Checklist() {
   const [processingTask, setProcessingTask] = useState(null);
 
   // -------- NORMALIZE DATE (ignore time) --------
+  //working
   const normalizeDate = (d) => {
     if (!d) return null;
     const x = new Date(d);
