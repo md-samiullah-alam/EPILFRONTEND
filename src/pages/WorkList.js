@@ -7,8 +7,11 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
+const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Yearly"];
 const WORKING_TIMES = ["30M", "45M", "60M", "90M", "120M", "150M", "180M", "210M", "240M", "300M"];
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const MONTH_DATES = Array.from({ length: 31 }, (_, i) => i + 1);
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const PAGE_SIZE = 15;
 
 export default function WorkList() {
@@ -26,6 +29,11 @@ export default function WorkList() {
     WorkingTime: "60M",
     TemplateLinkRemark: ""
   });
+  const [schedule, setSchedule] = useState({ scheduleDays: "", scheduleDates: "" });
+  const [selectedDays, setSelectedDays] = useState([]);
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [yearlyMonth, setYearlyMonth] = useState("January");
+  const [yearlyDate, setYearlyDate] = useState(1);
   const [saving, setSaving] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkData, setBulkData] = useState([]);
@@ -55,6 +63,11 @@ export default function WorkList() {
   const openCreate = () => {
     setEditing(null);
     setForm({ WorklistName: "", Frequency: "Daily", WorkingTime: "60M", TemplateLinkRemark: "" });
+    setSchedule({ scheduleDays: "", scheduleDates: "" });
+    setSelectedDays([]);
+    setSelectedDates([]);
+    setYearlyMonth("January");
+    setYearlyDate(1);
     setCustomWorkingTime("");
     setShowModal(true);
   };
@@ -73,6 +86,29 @@ export default function WorkList() {
       WorkingTime: wl.WorkingTime,
       TemplateLinkRemark: wl.TemplateLink || wl.Remark || ""
     });
+    
+    // Parse schedule for edit
+    if (wl.Frequency === "Weekly" && wl.ScheduleDays) {
+      const days = wl.ScheduleDays.split(",");
+      setSelectedDays(days);
+      setSchedule({ scheduleDays: wl.ScheduleDays, scheduleDates: "" });
+    } else if (wl.Frequency === "Monthly" && wl.ScheduleDates) {
+      const dates = wl.ScheduleDates.split(",").map(Number);
+      setSelectedDates(dates);
+      setSchedule({ scheduleDays: "", scheduleDates: wl.ScheduleDates });
+    } else if (wl.Frequency === "Yearly" && wl.ScheduleDates) {
+      const parts = wl.ScheduleDates.split(" ");
+      if (parts.length === 2) {
+        setYearlyMonth(parts[0]);
+        setYearlyDate(parseInt(parts[1]));
+        setSchedule({ scheduleDays: "", scheduleDates: wl.ScheduleDates });
+      }
+    } else {
+      setSelectedDays([]);
+      setSelectedDates([]);
+      setSchedule({ scheduleDays: "", scheduleDates: "" });
+    }
+    
     setCustomWorkingTime("");
     setShowModal(true);
   };
@@ -88,9 +124,49 @@ export default function WorkList() {
     }
   };
 
+  const handleDayToggle = (day) => {
+    let newDays;
+    if (selectedDays.includes(day)) {
+      newDays = selectedDays.filter(d => d !== day);
+    } else {
+      newDays = [...selectedDays, day];
+    }
+    setSelectedDays(newDays);
+    setSchedule({ scheduleDays: newDays.join(","), scheduleDates: "" });
+  };
+
+  const handleDateToggle = (date) => {
+    let newDates;
+    if (selectedDates.includes(date)) {
+      newDates = selectedDates.filter(d => d !== date);
+    } else {
+      newDates = [...selectedDates, date];
+    }
+    setSelectedDates(newDates);
+    setSchedule({ scheduleDays: "", scheduleDates: newDates.join(",") });
+  };
+
+  const handleYearlyChange = (month, date) => {
+    setYearlyMonth(month);
+    setYearlyDate(date);
+    setSchedule({ scheduleDays: "", scheduleDates: `${month} ${date}` });
+  };
+
   const handleSave = async () => {
     if (!form.WorklistName.trim()) return toast.warn("Worklist Name is required");
     if (!form.WorkingTime) return toast.warn("Working Time is required");
+    
+    // Validate schedule based on frequency
+    if (form.Frequency === "Weekly" && !schedule.scheduleDays) {
+      return toast.warn("Please select at least one day for Weekly frequency");
+    }
+    if (form.Frequency === "Monthly" && !schedule.scheduleDates) {
+      return toast.warn("Please select at least one date for Monthly frequency");
+    }
+    if (form.Frequency === "Yearly" && !schedule.scheduleDates) {
+      return toast.warn("Please select month and date for Yearly frequency");
+    }
+    
     setSaving(true);
     try {
       const val = form.TemplateLinkRemark.trim();
@@ -101,7 +177,9 @@ export default function WorkList() {
         Frequency: form.Frequency,
         WorkingTime: form.WorkingTime,
         TemplateLink: isUrl ? val : "",
-        Remark: !isUrl ? val : ""
+        Remark: !isUrl ? val : "",
+        ScheduleDays: schedule.scheduleDays,
+        ScheduleDates: schedule.scheduleDates
       };
       
       if (editing) {
@@ -118,100 +196,52 @@ export default function WorkList() {
     } finally { setSaving(false); }
   };
 
-  // Download Sample Bulk Upload Format (Excel with 5 dummy samples)
   const downloadSampleBulkUpload = () => {
     const sampleData = [
-      { 
-        WorklistName: "Daily Sales Report", 
-        Frequency: "Daily", 
-        WorkingTime: "60M", 
-        TemplateLinkRemark: "https://docs.google.com/spreadsheets/d/1ABC123_DAILY_SALES" 
-      },
-      { 
-        WorklistName: "Weekly Team Meeting", 
-        Frequency: "Weekly", 
-        WorkingTime: "90M", 
-        TemplateLinkRemark: "Meeting agenda and minutes to be updated" 
-      },
-      { 
-        WorklistName: "Monthly Performance Review", 
-        Frequency: "Monthly", 
-        WorkingTime: "120M", 
-        TemplateLinkRemark: "https://docs.google.com/spreadsheets/d/2XYZ456_MONTHLY_REVIEW" 
-      },
-      { 
-        WorklistName: "Client Follow-up Calls", 
-        Frequency: "Daily", 
-        WorkingTime: "45M", 
-        TemplateLinkRemark: "Call all pending clients and update status" 
-      },
-      { 
-        WorklistName: "Quarterly Business Review", 
-        Frequency: "Monthly", 
-        WorkingTime: "180M", 
-        TemplateLinkRemark: "https://docs.google.com/presentation/d/3QRS789_QBR" 
-      }
+      { WorklistName: "Daily Sales Report", Frequency: "Daily", WorkingTime: "60M", ScheduleDays: "", ScheduleDates: "", TemplateLinkRemark: "https://docs.google.com/spreadsheets/d/1ABC123" },
+      { WorklistName: "Weekly Team Meeting", Frequency: "Weekly", WorkingTime: "90M", ScheduleDays: "Monday,Wednesday,Friday", ScheduleDates: "", TemplateLinkRemark: "Meeting agenda and minutes" },
+      { WorklistName: "Monthly Review", Frequency: "Monthly", WorkingTime: "120M", ScheduleDays: "", ScheduleDates: "1,15,30", TemplateLinkRemark: "https://docs.google.com/spreadsheets/d/2XYZ456" },
+      { WorklistName: "Annual Report", Frequency: "Yearly", WorkingTime: "180M", ScheduleDays: "", ScheduleDates: "December 25", TemplateLinkRemark: "https://docs.google.com/presentation/d/3QRS789" },
+      { WorklistName: "Client Follow-up", Frequency: "Weekly", WorkingTime: "45M", ScheduleDays: "Tuesday,Thursday", ScheduleDates: "", TemplateLinkRemark: "Call all pending clients" }
     ];
     
     const ws = XLSX.utils.json_to_sheet(sampleData);
-    ws['!cols'] = [{wch:35}, {wch:12}, {wch:12}, {wch:60}];
+    ws['!cols'] = [{wch:30}, {wch:12}, {wch:10}, {wch:25}, {wch:15}, {wch:50}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sample_Bulk_Upload");
     XLSX.writeFile(wb, `Sample_Bulk_Upload_Format.xlsx`);
-    toast.success("✅ Sample Bulk Upload file downloaded! Use this format.");
+    toast.success("✅ Sample Bulk Upload file downloaded!");
   };
 
-  // Download Sample Format (PDF)
   const downloadSamplePDF = () => {
     const doc = new jsPDF();
-    
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setTextColor(33, 33, 33);
     doc.text("📋 Sample Bulk Upload Format", 14, 20);
-    
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text("Follow this exact format for bulk upload:", 14, 30);
-    doc.text("Column Names (must match exactly):", 14, 38);
     
     const sampleData = [
-      ["Daily Sales Report", "Daily", "60M", "https://docs.google.com/spreadsheets/d/1ABC123"],
-      ["Weekly Team Meeting", "Weekly", "90M", "Meeting agenda and minutes"],
-      ["Monthly Performance Review", "Monthly", "120M", "https://docs.google.com/spreadsheets/d/2XYZ456"],
-      ["Client Follow-up Calls", "Daily", "45M", "Call all pending clients"],
-      ["Quarterly Business Review", "Monthly", "180M", "https://docs.google.com/presentation/d/3QRS789"],
+      ["Daily Sales Report", "Daily", "60M", "", "", "https://docs.google.com/..."],
+      ["Weekly Team Meeting", "Weekly", "90M", "Monday,Wednesday,Friday", "", "Meeting agenda"],
+      ["Monthly Review", "Monthly", "120M", "", "1,15,30", "https://docs.google.com/..."],
+      ["Annual Report", "Yearly", "180M", "", "December 25", "https://docs.google.com/..."],
     ];
     
     autoTable(doc, {
-      startY: 48,
-      head: [["WorklistName", "Frequency", "WorkingTime", "TemplateLinkRemark"]],
+      startY: 40,
+      head: [["WorklistName", "Frequency", "WorkingTime", "ScheduleDays", "ScheduleDates", "TemplateLinkRemark"]],
       body: sampleData,
       theme: "striped",
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 55 }
-      }
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 7 },
     });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(200, 100, 0);
-    doc.text("⚠️ Instructions:", 14, doc.lastAutoTable.finalY + 10);
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text("1. WorklistName - Name of the task (required)", 14, doc.lastAutoTable.finalY + 18);
-    doc.text("2. Frequency - Must be: Daily, Weekly, or Monthly (required)", 14, doc.lastAutoTable.finalY + 24);
-    doc.text("3. WorkingTime - Minutes format (e.g., 30M, 60M, 90M, 120M, 180M) (required)", 14, doc.lastAutoTable.finalY + 30);
-    doc.text("4. TemplateLinkRemark - Google Sheet link OR any remark (optional)", 14, doc.lastAutoTable.finalY + 36);
     
     doc.save(`Sample_Bulk_Upload_Format.pdf`);
     toast.success("✅ Sample PDF format downloaded!");
   };
 
-  // Download PDF Report
   const downloadPDFReport = () => {
     if (worklists.length === 0) {
       toast.info("No data to download");
@@ -235,18 +265,18 @@ export default function WorkList() {
       idx + 1,
       wl.WorklistName,
       wl.Frequency,
+      wl.ScheduleDays || wl.ScheduleDates || "-",
       wl.WorkingTime,
       wl.TemplateLink || wl.Remark || "-"
     ]);
     
     autoTable(doc, {
       startY: 50,
-      head: [["#", "Worklist Name", "Frequency", "Working Time (Minutes)", "Link / Remark"]],
+      head: [["#", "Worklist Name", "Frequency", "Schedule", "Time", "Link/Remark"]],
       body: tableData,
       theme: "striped",
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
-      margin: { left: 14, right: 14 }
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
     });
     
     doc.save(`MyWorkList_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -262,52 +292,45 @@ export default function WorkList() {
         const wb = XLSX.read(evt.target.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (rows.length < 2) return toast.warn("Empty file or no data rows");
+        if (rows.length < 2) return toast.warn("Empty file");
 
         const headers = rows[0].map(h => String(h).trim().toLowerCase());
         
         const nameIdx = headers.findIndex(h => h.includes("worklistname") || h.includes("name"));
         const freqIdx = headers.findIndex(h => h.includes("frequency") || h.includes("freq"));
         const timeIdx = headers.findIndex(h => h.includes("workingtime") || h.includes("time"));
-        const remarkIdx = headers.findIndex(h => h.includes("templatelinkremark") || h.includes("remark") || h.includes("template") || h.includes("link"));
-
-        if (nameIdx === -1 || freqIdx === -1 || timeIdx === -1) {
-          return toast.warn("File must have columns: WorklistName, Frequency, WorkingTime");
-        }
+        const daysIdx = headers.findIndex(h => h.includes("scheduledays") || h.includes("days"));
+        const datesIdx = headers.findIndex(h => h.includes("scheduledates") || h.includes("dates"));
+        const remarkIdx = headers.findIndex(h => h.includes("templatelinkremark") || h.includes("remark") || h.includes("link"));
 
         const parsed = rows.slice(1)
           .filter(r => r && r.some(c => c !== undefined && c !== null && String(c).trim() !== ""))
           .map((r, i) => {
             let workingTime = String(r[timeIdx] || "").trim();
-            // Ensure WorkingTime has M suffix
             if (workingTime && !workingTime.toUpperCase().endsWith('M') && !isNaN(parseInt(workingTime))) {
               workingTime = `${parseInt(workingTime)}M`;
             }
             
             const remarkValue = remarkIdx !== -1 ? String(r[remarkIdx] || "").trim() : "";
-            const isUrl = remarkValue.startsWith('http://') || remarkValue.startsWith('https://') || remarkValue.includes('docs.google.com');
+            const isUrl = remarkValue.startsWith('http://') || remarkValue.startsWith('https://');
             
             return {
               row: i + 2,
               WorklistName: String(r[nameIdx] || "").trim(),
               Frequency: String(r[freqIdx] || "Daily").trim(),
               WorkingTime: workingTime,
+              ScheduleDays: daysIdx !== -1 ? String(r[daysIdx] || "").trim() : "",
+              ScheduleDates: datesIdx !== -1 ? String(r[datesIdx] || "").trim() : "",
               TemplateLink: isUrl ? remarkValue : "",
               Remark: !isUrl ? remarkValue : ""
             };
           })
           .filter(d => d.WorklistName && d.Frequency && d.WorkingTime);
 
-        if (parsed.length === 0) {
-          toast.warn("No valid data rows found. Please check sample format.");
-          return;
-        }
-        
         setBulkData(parsed);
         setBulkResult(null);
-        toast.success(`${parsed.length} rows loaded successfully!`);
+        toast.success(`${parsed.length} rows loaded!`);
       } catch (err) { 
-        console.error(err);
         toast.error("Invalid file format. Please download sample file first."); 
       }
     };
@@ -337,9 +360,10 @@ export default function WorkList() {
         WorklistName: d.WorklistName, 
         Frequency: d.Frequency, 
         WorkingTime: d.WorkingTime,
+        ScheduleDays: d.ScheduleDays || "",
+        ScheduleDates: d.ScheduleDates || "",
         TemplateLinkRemark: d.TemplateLink || d.Remark || ""
       })));
-      ws['!cols'] = [{wch:35}, {wch:12}, {wch:12}, {wch:60}];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "MyWorkList");
       XLSX.writeFile(wb, `MyWorkList_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -353,10 +377,17 @@ export default function WorkList() {
     setBulkResult(null);
   };
 
-  const formatWorkingTimeDisplay = (time) => {
-    if (!time) return "-";
-    const minutes = time.replace('M', '');
-    return `${minutes} Minutes`;
+  const getScheduleDisplay = (wl) => {
+    if (wl.Frequency === "Weekly" && wl.ScheduleDays) {
+      return `📅 ${wl.ScheduleDays}`;
+    }
+    if (wl.Frequency === "Monthly" && wl.ScheduleDates) {
+      return `📅 Dates: ${wl.ScheduleDates}`;
+    }
+    if (wl.Frequency === "Yearly" && wl.ScheduleDates) {
+      return `📅 Every ${wl.ScheduleDates}`;
+    }
+    return `📅 Every day`;
   };
 
   const filtered = worklists.filter((w) =>
@@ -377,7 +408,7 @@ export default function WorkList() {
         <div className="flex gap-2 flex-wrap">
           <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700">+ Add</button>
           <button onClick={() => setShowBulk(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">📤 Bulk Upload</button>
-          {/* <button onClick={handleDownload} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700">📥 Download Excel</button> */}
+          <button onClick={handleDownload} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700">📥 Download Excel</button>
           <button onClick={downloadPDFReport} className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-700">📄 Download PDF</button>
         </div>
       </div>
@@ -387,9 +418,7 @@ export default function WorkList() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20">
-          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-        </div>
+        <div className="text-center py-20"><div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-300">
           <p className="text-slate-400 font-bold">No worklists found</p>
@@ -409,9 +438,11 @@ export default function WorkList() {
                     <div className="flex flex-wrap gap-3 mt-1 text-xs font-medium text-slate-500">
                       <span className={`px-2 py-0.5 rounded-full font-bold ${
                         wl.Frequency === "Daily" ? "bg-blue-100 text-blue-700" : 
-                        wl.Frequency === "Weekly" ? "bg-amber-100 text-amber-700" : "bg-purple-100 text-purple-700"
+                        wl.Frequency === "Weekly" ? "bg-amber-100 text-amber-700" : 
+                        wl.Frequency === "Monthly" ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
                       }`}>{wl.Frequency}</span>
-                      <span>⏰ {formatWorkingTimeDisplay(wl.WorkingTime)}</span>
+                      <span>⏰ {wl.WorkingTime}</span>
+                      <span className="text-green-600">{getScheduleDisplay(wl)}</span>
                     </div>
                     {(wl.TemplateLink || wl.Remark) && (
                       <div className="mt-3 pt-2 border-t border-slate-100">
@@ -452,80 +483,95 @@ export default function WorkList() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4"
-          onClick={(e) => handleClickOutside(e, addModalRef, closeModal)}
-        >
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4" onClick={(e) => handleClickOutside(e, addModalRef, closeModal)}>
           <div ref={addModalRef} className="bg-white rounded-xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto relative">
-            <button 
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold"
-            >
-              ✕
-            </button>
+            <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
             <h2 className="text-lg font-black text-slate-800 mb-4">{editing ? "✏️ Edit WorkList" : "➕ Add WorkList"}</h2>
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Worklist Name *</label>
                 <input type="text" value={form.WorklistName} onChange={(e) => setForm({ ...form, WorklistName: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Enter worklist name" />
               </div>
+              
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Frequency *</label>
-                <select value={form.Frequency} onChange={(e) => setForm({ ...form, Frequency: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <select value={form.Frequency} onChange={(e) => {
+                  setForm({ ...form, Frequency: e.target.value });
+                  setSelectedDays([]);
+                  setSelectedDates([]);
+                  setSchedule({ scheduleDays: "", scheduleDates: "" });
+                }} className="w-full border rounded-lg px-3 py-2 text-sm">
                   {FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
+              
+              {/* Schedule Section based on Frequency */}
+              {form.Frequency === "Weekly" && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Select Days *</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEK_DAYS.map(day => (
+                      <button key={day} type="button" onClick={() => handleDayToggle(day)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${selectedDays.includes(day) ? "bg-blue-600 text-white shadow-md" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                        {day.slice(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedDays.length > 0 && <p className="text-xs text-blue-600">✅ Selected: {selectedDays.join(", ")}</p>}
+                </div>
+              )}
+              
+              {form.Frequency === "Monthly" && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Select Dates *</label>
+                  <div className="grid grid-cols-7 gap-1 max-h-32 overflow-y-auto p-2 border rounded-lg">
+                    {MONTH_DATES.map(date => (
+                      <button key={date} type="button" onClick={() => handleDateToggle(date)} className={`px-2 py-1 rounded text-xs font-bold transition-all ${selectedDates.includes(date) ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                        {date}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedDates.length > 0 && <p className="text-xs text-purple-600">✅ Selected: {selectedDates.join(", ")}</p>}
+                </div>
+              )}
+              
+              {form.Frequency === "Yearly" && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Select Month and Date *</label>
+                  <div className="flex gap-3">
+                    <select value={yearlyMonth} onChange={(e) => handleYearlyChange(e.target.value, yearlyDate)} className="flex-1 border rounded-lg px-3 py-2 text-sm">
+                      {MONTHS.map(month => <option key={month} value={month}>{month}</option>)}
+                    </select>
+                    <select value={yearlyDate} onChange={(e) => handleYearlyChange(yearlyMonth, parseInt(e.target.value))} className="w-24 border rounded-lg px-3 py-2 text-sm">
+                      {MONTH_DATES.map(date => <option key={date} value={date}>{date}</option>)}
+                    </select>
+                  </div>
+                  <p className="text-xs text-orange-600">✅ Every year on {yearlyMonth} {yearlyDate}</p>
+                </div>
+              )}
+              
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Working Time (Minutes) *</label>
-                <select 
-                  value={WORKING_TIMES.includes(form.WorkingTime) ? form.WorkingTime : "custom"} 
-                  onChange={(e) => handleWorkingTimeChange(e.target.value)} 
-                  className="w-full border rounded-lg px-3 py-2 text-sm mb-2"
-                >
-                  <option value="30M">30 Minutes</option>
-                  <option value="45M">45 Minutes</option>
-                  <option value="60M">60 Minutes (1 Hour)</option>
-                  <option value="90M">90 Minutes (1.5 Hours)</option>
-                  <option value="120M">120 Minutes (2 Hours)</option>
-                  <option value="150M">150 Minutes (2.5 Hours)</option>
-                  <option value="180M">180 Minutes (3 Hours)</option>
-                  <option value="210M">210 Minutes (3.5 Hours)</option>
-                  <option value="240M">240 Minutes (4 Hours)</option>
-                  <option value="300M">300 Minutes (5 Hours)</option>
+                <select value={WORKING_TIMES.includes(form.WorkingTime) ? form.WorkingTime : "custom"} onChange={(e) => handleWorkingTimeChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm mb-2">
+                  <option value="30M">30 Minutes</option><option value="45M">45 Minutes</option>
+                  <option value="60M">60 Minutes (1 Hour)</option><option value="90M">90 Minutes (1.5 Hours)</option>
+                  <option value="120M">120 Minutes (2 Hours)</option><option value="150M">150 Minutes (2.5 Hours)</option>
+                  <option value="180M">180 Minutes (3 Hours)</option><option value="210M">210 Minutes (3.5 Hours)</option>
+                  <option value="240M">240 Minutes (4 Hours)</option><option value="300M">300 Minutes (5 Hours)</option>
                   <option value="custom">Custom Minutes...</option>
                 </select>
                 {(!WORKING_TIMES.includes(form.WorkingTime) || form.WorkingTime === "custom") && (
-                  <div className="flex gap-2">
-                    <input 
-                      type="number" 
-                      placeholder="Enter minutes (e.g., 75)" 
-                      value={customWorkingTime}
-                      onChange={(e) => {
-                        setCustomWorkingTime(e.target.value);
-                        if (e.target.value && !isNaN(parseInt(e.target.value))) {
-                          setForm({ ...form, WorkingTime: `${parseInt(e.target.value)}M` });
-                        }
-                      }}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
+                  <input type="number" placeholder="Enter minutes (e.g., 75)" value={customWorkingTime} onChange={(e) => { setCustomWorkingTime(e.target.value); if (e.target.value && !isNaN(parseInt(e.target.value))) { setForm({ ...form, WorkingTime: `${parseInt(e.target.value)}M` }); } }} className="w-full border rounded-lg px-3 py-2 text-sm" />
                 )}
-                <p className="text-xs text-slate-400 mt-1">Format: 30M, 60M, 90M, 120M, etc.</p>
               </div>
+              
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">📎 Work List Template Link / Remark</label>
-                <textarea 
-                  value={form.TemplateLinkRemark} 
-                  onChange={(e) => setForm({ ...form, TemplateLinkRemark: e.target.value })} 
-                  className="w-full border rounded-lg px-3 py-2 text-sm" 
-                  rows="3"
-                  placeholder="Paste Google Sheet link OR add any remark/note..."
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  💡 If it starts with http:// or https:// it will be saved as Template Link, otherwise as Remark
-                </p>
+                <label className="block text-xs font-bold text-slate-600 mb-1">📎 Template Link / Remark</label>
+                <textarea value={form.TemplateLinkRemark} onChange={(e) => setForm({ ...form, TemplateLinkRemark: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" rows="3" placeholder="Paste Google Sheet link OR add any remark/note..." />
+                <p className="text-xs text-slate-400 mt-1">💡 If it starts with http:// or https:// it will be saved as Template Link, otherwise as Remark</p>
               </div>
             </div>
+            
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={closeModal} className="px-4 py-2 bg-gray-200 rounded-lg font-bold text-sm">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 disabled:bg-blue-300">{saving ? "Saving..." : "Save"}</button>
@@ -536,107 +582,52 @@ export default function WorkList() {
 
       {/* Bulk Upload Modal */}
       {showBulk && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4"
-          onClick={(e) => handleClickOutside(e, bulkModalRef, closeBulkModal)}
-        >
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4" onClick={(e) => handleClickOutside(e, bulkModalRef, closeBulkModal)}>
           <div ref={bulkModalRef} className="bg-white rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[85vh] overflow-y-auto relative">
-            <button 
-              onClick={closeBulkModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold"
-            >
-              ✕
-            </button>
-            
+            <button onClick={closeBulkModal} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
             <h2 className="text-lg font-black text-slate-800 mb-4">📤 Bulk Upload WorkLists</h2>
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg text-blue-700 text-sm font-medium">👤 Uploading for: <strong>{user?.name}</strong></div>
             
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-medium">
-              👤 Uploading for: <strong>{user?.name}</strong>
-            </div>
-
-            {/* Sample Format Section */}
-            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300 rounded-xl shadow-sm">
-              <p className="text-base font-bold text-amber-800 mb-2 flex items-center gap-2">
-                📋 <span className="underline">Sample Bulk Upload Format</span>
-              </p>
-              <p className="text-xs text-amber-700 mb-3">Download sample file to see the correct format <strong>(5 dummy samples included)</strong>:</p>
-              
-              <div className="flex gap-3 mb-4">
-                <button 
-                  onClick={downloadSampleBulkUpload}
-                  className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-emerald-700 flex-1 flex items-center justify-center gap-2"
-                >
-                  📥 Sample Bulk Upload (Excel)
-                </button>
-                <button 
-                  onClick={downloadSamplePDF}
-                  className="bg-red-600 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-red-700 flex-1 flex items-center justify-center gap-2"
-                >
-                  📄 Sample Bulk Upload (PDF)
-                </button>
+            <div className="mb-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+              <p className="text-base font-bold text-amber-800 mb-2">📋 Sample Bulk Upload Format</p>
+              <div className="flex gap-3 mb-3">
+                <button onClick={downloadSampleBulkUpload} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex-1">📥 Sample Bulk Upload (Excel)</button>
+                <button onClick={downloadSamplePDF} className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex-1">📄 Sample Bulk Upload (PDF)</button>
               </div>
-              
-              <div className="mt-3 p-3 bg-white rounded-lg border border-amber-200">
-                <p className="font-bold text-xs text-amber-800 mb-2">📌 Expected Columns (Excel):</p>
-                <div className="space-y-1 text-xs text-amber-700">
-                  <p>1. <strong className="text-amber-800">WorklistName</strong> - Name of the task (e.g., Daily Report)</p>
-                  <p>2. <strong className="text-amber-800">Frequency</strong> - Daily / Weekly / Monthly</p>
-                  <p>3. <strong className="text-amber-800">WorkingTime</strong> - Minutes format (e.g., 60M, 90M, 120M)</p>
-                  <p>4. <strong className="text-amber-800">TemplateLinkRemark</strong> - Google Sheet link OR remark text</p>
-                </div>
-                <p className="mt-2 text-xs text-amber-600 font-bold">⚠️ WorkingTime examples: 30M, 45M, 60M, 90M, 120M, 180M</p>
+              <div className="text-xs text-amber-700">
+                <p className="font-bold">Columns: WorklistName, Frequency, WorkingTime, ScheduleDays, ScheduleDates, TemplateLinkRemark</p>
+                <p className="mt-1">• Weekly: ScheduleDays = "Monday,Wednesday,Friday"</p>
+                <p>• Monthly: ScheduleDates = "1,15,30"</p>
+                <p>• Yearly: ScheduleDates = "December 25"</p>
               </div>
             </div>
 
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center mb-4 bg-slate-50">
-              <input type="file" accept=".xlsx,.csv" onChange={handleFileUpload} className="block w-full text-sm file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-              <p className="text-xs text-slate-400 mt-2">Upload Excel file with columns: WorklistName, Frequency, WorkingTime, TemplateLinkRemark</p>
+            <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center mb-4">
+              <input type="file" accept=".xlsx,.csv" onChange={handleFileUpload} className="block w-full text-sm" />
             </div>
 
             {bulkData.length > 0 && (
               <div className="mb-4">
-                <p className="text-sm font-bold text-slate-700 mb-2">{bulkData.length} rows ready to upload</p>
+                <p className="text-sm font-bold">{bulkData.length} rows ready</p>
                 <div className="max-h-40 overflow-y-auto text-xs border rounded-lg">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-slate-100 sticky top-0">
-                        <th className="p-2">#</th>
-                        <th className="p-2">Worklist Name</th>
-                        <th className="p-2">Frequency</th>
-                        <th className="p-2">Working Time</th>
-                        <th className="p-2">Link/Remark</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkData.slice(0, 5).map((d, i) => (
-                        <tr key={i} className="border-t">
-                          <td className="p-2 text-slate-400">{d.row}</td>
-                          <td className="p-2 font-medium">{d.WorklistName}</td>
-                          <td className="p-2">{d.Frequency}</td>
-                          <td className="p-2">{d.WorkingTime}</td>
-                          <td className="p-2 max-w-[150px] truncate text-blue-600">{d.TemplateLink || d.Remark || "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <table className="w-full"><tbody>
+                    {bulkData.slice(0, 5).map((d, i) => (<tr key={i} className="border-t"><td className="p-2">{d.WorklistName}</td><td className="p-2">{d.Frequency}</td><td className="p-2">{d.WorkingTime}</td></tr>))}
+                  </tbody></table>
                 </div>
-                {bulkData.length > 5 && <p className="text-slate-400 text-xs mt-1">...and {bulkData.length - 5} more rows</p>}
               </div>
             )}
 
             {bulkResult && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-lg text-xs space-y-1">
-                <p className="font-bold text-emerald-600">✅ Created: {bulkResult.summary?.created || 0}</p>
-                <p className="font-bold text-amber-600">⏭️ Skipped (Duplicates): {bulkResult.summary?.skipped || 0}</p>
-                <p className="font-bold text-rose-600">❌ Errors: {bulkResult.summary?.errors || 0}</p>
+              <div className="mb-4 p-3 bg-slate-50 rounded-lg text-xs">
+                <p className="text-emerald-600">✅ Created: {bulkResult.summary?.created || 0}</p>
+                <p className="text-amber-600">⏭️ Skipped: {bulkResult.summary?.skipped || 0}</p>
+                <p className="text-rose-600">❌ Errors: {bulkResult.summary?.errors || 0}</p>
               </div>
             )}
 
             <div className="flex justify-end gap-3">
-              <button onClick={closeBulkModal} className="px-4 py-2 bg-gray-200 rounded-lg font-bold text-sm">Close</button>
-              <button onClick={handleBulkUpload} disabled={uploading || !bulkData.length} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 disabled:bg-indigo-300">
-                {uploading ? "⏳ Uploading..." : `📤 Upload ${bulkData.length} rows`}
-              </button>
+              <button onClick={closeBulkModal} className="px-4 py-2 bg-gray-200 rounded-lg">Close</button>
+              <button onClick={handleBulkUpload} disabled={uploading || !bulkData.length} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">{uploading ? "Uploading..." : `Upload ${bulkData.length} rows`}</button>
             </div>
           </div>
         </div>
