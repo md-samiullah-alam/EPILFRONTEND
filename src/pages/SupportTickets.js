@@ -314,7 +314,7 @@ export default function SupportTicket() {
     }
   };
 
-  // Group tickets by Issue
+  // Group tickets by Issue with Department
   const groupTicketsByIssue = (tickets) => {
     const grouped = {};
     
@@ -333,6 +333,7 @@ export default function SupportTicket() {
           DoneDate: ticket.DoneDate || "",
           Taskcompletedapproval: ticket.Taskcompletedapproval || "Pending",
           AssignedTo: ticket.AssignedTo,
+          Department: ticket.Department || "N/A",
           uniqueWorkBy: ticket.WorkBy ? [ticket.WorkBy] : []
         };
       } else {
@@ -352,6 +353,11 @@ export default function SupportTicket() {
         // Update Taskcompletedapproval - if any ticket is approved, show approved
         if (ticket.Taskcompletedapproval === "Approved") {
           grouped[ticket.Issue].Taskcompletedapproval = "Approved";
+        }
+        
+        // Department should be same for same issue
+        if (ticket.Department && !grouped[ticket.Issue].Department) {
+          grouped[ticket.Issue].Department = ticket.Department;
         }
       }
     });
@@ -511,7 +517,7 @@ export default function SupportTicket() {
             </button>
           </div>
 
-          {/* Assigned Tickets List - 3 Line Layout */}
+          {/* Assigned Tickets List - 4 Line Layout with Department */}
           <div className="space-y-2">
             {groupedAssigned.length === 0 && (
               <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
@@ -550,7 +556,15 @@ export default function SupportTicket() {
                         <span className="font-medium">{formatDate(group.CreatedDate)}</span>
                       </div>
                       
-                      {/* Line 3: Assigned To / Work By | Status | Done Date */}
+                      {/* Line 3: DEPARTMENT (NEW) */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-1">
+                        <span className="text-gray-500">Department:</span>
+                        <span className="font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                          {group.Department}
+                        </span>
+                      </div>
+                      
+                      {/* Line 4: Assigned To / Work By | Status | Done Date */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <span className="text-gray-500">Assigned To:</span>
                         <span className="font-medium text-blue-600">
@@ -674,7 +688,7 @@ export default function SupportTicket() {
             </button>
           </div>
 
-          {/* Created Tickets List - 3 Line Layout */}
+          {/* Created Tickets List - 4 Line Layout with Department */}
           <div className="space-y-2">
             {groupedCreated.length === 0 && (
               <div className="text-gray-500 text-center py-6 bg-white rounded-lg shadow-sm text-sm">
@@ -713,7 +727,15 @@ export default function SupportTicket() {
                         <span className="font-medium">{formatDate(group.CreatedDate)}</span>
                       </div>
                       
-                      {/* Line 3: Assigned To / Work By | Status | Done Date */}
+                      {/* Line 3: DEPARTMENT (NEW) */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-1">
+                        <span className="text-gray-500">Department:</span>
+                        <span className="font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                          {group.Department}
+                        </span>
+                      </div>
+                      
+                      {/* Line 4: Assigned To / Work By | Status | Done Date */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <span className="text-gray-500">Assigned To:</span>
                         <span className="font-medium text-blue-600">
